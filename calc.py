@@ -1,26 +1,25 @@
 import math
 
-PLASTIC_PRICE = 129
 HOUR_PRICE = 5
 PROFIT = 0.40
 
 def round5(x):
     return int(math.ceil(x / 5.0)) * 5
 
-def calculate_price(weight, hours):
-    plastic = (weight / 1000) * PLASTIC_PRICE
+def calculate_price(weight, hours, plastic_price=129, extra=0):
+    plastic = (weight / 1000) * plastic_price
     time_cost = hours * HOUR_PRICE
 
-    cost = plastic + time_cost
+    cost = plastic + time_cost + extra
     profit = cost * PROFIT
     total = cost + profit
 
     total_rounded = round5(total)
 
     return {
-        "plastic": round(plastic, 2),
-        "time_cost": round(time_cost, 2),
-        "cost": round(cost, 2),
-        "profit": round(profit, 2),
+        "plastic": round(plastic,2),
+        "time_cost": round(time_cost,2),
+        "cost": round(cost,2),
+        "profit": round(profit,2),
         "total": total_rounded
     }
