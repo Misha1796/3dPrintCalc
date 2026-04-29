@@ -100,7 +100,7 @@ def delivery_menu():
         [InlineKeyboardButton(text="◀️ Назад", callback_data="cancel")]
     ])
 
-# --- ОБРАБОТЧИКИ ---
+# --- ОБРАБОТЧИКИ CALLBACK ---
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
@@ -125,7 +125,7 @@ async def show_history(callback: types.CallbackQuery):
 
     text = "📋 **Последние 10 расчетов:**\n\n"
     for r in rows:
-        # r[2]=пластик, r[3]=вес, r[4]=время, r[5]=итого
+        # Индексы: r[2]=пластик, r[3]=вес, r[4]=время, r[5]=итого
         text += f"🔹 **{r[2]}**: {r[3]}г / {r[4]}ч → **{r[5]}₪**\n"
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ В меню", callback_data="cancel")]])
@@ -181,7 +181,6 @@ async def finish_calc(callback: types.CallbackQuery):
         profit_percent=state.get("profit_percent", 0.4), delivery=state["delivery"]
     )
     
-    # Теперь сохраняем и вид пластика тоже
     save_history(user_id, state["plastic_name"], state["weight"], state["time"], res["total"])
     subtotal = res["total"] - state["delivery"]
 
@@ -207,12 +206,15 @@ async def finish_calc(callback: types.CallbackQuery):
 async def send_to_client(callback: types.CallbackQuery):
     state = user_state.get(callback.from_user.id)
     if state and "final_text" in state:
+        # Очистка чата: удаляем сообщение с кнопками
         await callback.message.delete()
+        # Отправляем чистый текст (в блоке для копирования)
         await callback.message.answer(f"```{state['final_text']}```", parse_mode="Markdown")
+        # Возвращаем главное меню новым сообщением
         await callback.message.answer("📦 **3dPrintCalc**\nВыберите действие:", reply_markup=main_menu(), parse_mode="Markdown")
         user_state.pop(callback.from_user.id, None)
 
-# --- РУЧНОЙ ВВОД ---
+# --- ОБРАБОТКА РУЧНОГО ВВОДА ---
 @dp.message()
 async def handle_input(message: types.Message):
     user_id = message.from_user.id
@@ -220,7 +222,7 @@ async def handle_input(message: types.Message):
     if not state or "main_msg_id" not in state: return
 
     try:
-        await message.delete()
+        await message.delete() # Удаляем цифру пользователя для чистоты
     except: pass
 
     msg_id = state["main_msg_id"]
