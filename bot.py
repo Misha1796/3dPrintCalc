@@ -22,6 +22,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
+            plastic TEXT,
             weight REAL,
             time REAL,
             total REAL
@@ -29,12 +30,12 @@ def init_db():
         """)
         conn.commit()
 
-def save_history(user_id, weight, time, total):
+def save_history(user_id, plastic, weight, time, total):
     with sqlite3.connect("history.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO history (user_id, weight, time, total) VALUES (?, ?, ?, ?)",
-            (user_id, weight, time, total)
+            "INSERT INTO history (user_id, plastic, weight, time, total) VALUES (?, ?, ?, ?, ?)",
+            (user_id, plastic, weight, time, total)
         )
         conn.commit()
 
@@ -47,14 +48,10 @@ def get_history(user_id):
         )
         return cursor.fetchall()
 
-# --- ЛОГИКА РАСЧЕТА (Встроенная) ---
+# --- ЛОГИКА РАСЧЕТА ---
 def calculate_price(weight, hours, plastic_price, extra, quantity, profit_percent, delivery):
-    # Себестоимость пластика (цена за кг / 1000 * вес)
     plastic_cost = (plastic_price / 1000) * weight
-    # Примерная стоимость часа работы (например, 5 шекелей)
     work_cost = hours * 5 
-    
-    # Итог: (Себестоимость + допы) * наценка * количество + доставка
     total = ((plastic_cost + work_cost + extra) * (1 + profit_percent)) * quantity + delivery
     return {"total": round(total, 1)}
 
@@ -126,10 +123,10 @@ async def show_history(callback: types.CallbackQuery):
         await callback.answer("История пуста", show_alert=True)
         return
 
-    text = "📋 **Последние расчеты:**\n\n"
+    text = "📋 **Последние 10 расчетов:**\n\n"
     for r in rows:
-        # r[2]=вес, r[3]=время, r[4]=итого
-        text += f"🔹 {r[2]}г / {r[3]}ч → **{r[4]}₪**\n"
+        # r[2]=пластик, r[3]=вес, r[4]=время, r[5]=итого
+        text += f"🔹 **{r[2]}**: {r[3]}г / {r[4]}ч → **{r[5]}₪**\n"
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ В меню", callback_data="cancel")]])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -184,7 +181,8 @@ async def finish_calc(callback: types.CallbackQuery):
         profit_percent=state.get("profit_percent", 0.4), delivery=state["delivery"]
     )
     
-    save_history(user_id, state["weight"], state["time"], res["total"])
+    # Теперь сохраняем и вид пластика тоже
+    save_history(user_id, state["plastic_name"], state["weight"], state["time"], res["total"])
     subtotal = res["total"] - state["delivery"]
 
     summary = (
@@ -209,15 +207,12 @@ async def finish_calc(callback: types.CallbackQuery):
 async def send_to_client(callback: types.CallbackQuery):
     state = user_state.get(callback.from_user.id)
     if state and "final_text" in state:
-        # 1. Удаляем меню
         await callback.message.delete()
-        # 2. Шлем чистый текст
         await callback.message.answer(f"```{state['final_text']}```", parse_mode="Markdown")
-        # 3. Шлем новое главное меню
         await callback.message.answer("📦 **3dPrintCalc**\nВыберите действие:", reply_markup=main_menu(), parse_mode="Markdown")
         user_state.pop(callback.from_user.id, None)
 
-# --- РУЧНОЙ ВВОД (ОДНО ОКНО) ---
+# --- РУЧНОЙ ВВОД ---
 @dp.message()
 async def handle_input(message: types.Message):
     user_id = message.from_user.id
@@ -225,7 +220,7 @@ async def handle_input(message: types.Message):
     if not state or "main_msg_id" not in state: return
 
     try:
-        await message.delete() # Удаляем цифру юзера
+        await message.delete()
     except: pass
 
     msg_id = state["main_msg_id"]
